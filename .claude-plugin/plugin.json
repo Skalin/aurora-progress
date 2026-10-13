@@ -1,0 +1,8 @@
+{
+  "name": "aurora-progress",
+  "version": "0.1.0",
+  "description": "Terminal-first progress band for Claude Code: gradient bar with a moving glint, live task and subagent rows above the prompt",
+  "author": { "name": "Dominik Skála" },
+  "repository": "https://github.com/Skalin/aurora-progress",
+  "types": "./types/index.d.ts"
+}

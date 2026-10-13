@@ -1,0 +1,6 @@
+{
+  "name": "aurora-progress",
+  "owner": { "name": "Dominik Skála" },
+  "metadata": { "description": "Aurora progress band for Claude Code" },
+  "plugins": [{ "name": "aurora-progress", "source": "./" }]
+}

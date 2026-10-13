@@ -1,0 +1,3 @@
+# laid by Claude Code at every load: the API typings and an editor tsconfig
+.claude-plugin/types/
+tsconfig.json
