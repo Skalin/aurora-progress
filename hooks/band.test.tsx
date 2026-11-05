@@ -32,3 +32,14 @@ test('finished shows 100%', async ($, on) => {
   await $.tool.call({ tool: 'mcp__aurora-progress__progress', title: 'Ship it', total: 2, done: 2, finished: true } as never)
   expect(await texts($, /^ · 100% · /)).toBe(1)
 })
+
+test('done moves tasks off queued: earlier ones done, the next one running', async ($, on) => {
+  await session($, on)
+  await $.tool.call({ tool: 'mcp__aurora-progress__progress', title: 'Ship it', tasks: ['Build', 'Test', 'Deploy'] } as never)
+  expect(await texts($, /^queued$/)).toBe(2)
+  await $.tool.call({ tool: 'mcp__aurora-progress__progress', done: 1 } as never)
+  expect(await texts($, /^queued$/)).toBe(1)
+  expect(await texts($, /^✔ $/)).toBe(1)
+  await $.tool.call({ tool: 'mcp__aurora-progress__progress', done: 3, finished: true } as never)
+  expect(await texts($, /^queued$/)).toBe(0)
+})

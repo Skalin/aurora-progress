@@ -81,6 +81,21 @@ const titlesOf = (tasks: ProgressInput['tasks']): string[] | undefined =>
     .slice(0, MAX_TASKS)
     .map(t => clip(t, MAX_TITLE))
 
+// Tasks the main session drives (no subagent): the first `done` are done, the next one runs,
+// the rest wait. A subagent's task keeps the status its run gives it.
+function staged(tasks: Task[], done: number, isFinished: boolean, at: number): Task[] {
+  return tasks.map((t, i) => {
+    if (t.agentId) return t
+    if (isFinished || i < done)
+      return t.status === 'done' ? t : { ...t, status: 'done', startedAt: t.startedAt ?? at, endedAt: at }
+    if (i === done) return t.status === 'running' ? t : { ...t, status: 'running', startedAt: at, endedAt: undefined }
+    return t.status === 'planned' ? t : { ...t, status: 'planned', startedAt: undefined, endedAt: undefined }
+  })
+}
+
+// A task a subagent can take: still waiting, or marked running by the main session's count.
+const isOpen = (t: Task): boolean => !t.agentId && (t.status === 'planned' || t.status === 'running')
+
 function merge(prev: Flow | null, input: ProgressInput, at: number): Flow {
   const title = input.title?.trim() ? clip(input.title.trim(), MAX_TITLE) : undefined
   const isNew = !prev || prev.isFinished || prev.isAuto || (title !== undefined && title !== prev.title)
@@ -95,13 +110,14 @@ function merge(prev: Flow | null, input: ProgressInput, at: number): Flow {
     : base.tasks
   const total = Math.max(0, Math.round(input.total ?? (titles ? tasks.length : base.total)))
   const isFinished = input.finished === true
+  const done = Math.max(0, Math.round(input.done ?? base.done))
 
   return {
     ...base,
     title: title ?? base.title,
-    tasks,
+    tasks: staged(tasks, done, isFinished, at),
     total,
-    done: Math.max(0, Math.round(input.done ?? base.done)),
+    done,
     isFinished,
     isAuto: false,
     endedAt: isFinished ? at : undefined,
@@ -277,7 +293,7 @@ export const register: Register = on => {
   // Every subagent shows up: on a planned task when its description matches, else as a task of its own.
   on('agent.spawn', async ($, e, next) => {
     const f0 = await read($, flow)
-    const isPlanned = isActive(f0) && !!f0?.tasks.some(t => t.status === 'planned' && norm(t.title) === norm(e.description))
+    const isPlanned = isActive(f0) && !!f0?.tasks.some(t => isOpen(t) && norm(t.title) === norm(e.description))
     const started = await next(isPlanned && !e.prompt.includes(STEP_TOOL) ? { ...e, prompt: e.prompt + STEP_BRIEF } : e)
     if (started.deny !== undefined) return started
 
@@ -287,7 +303,7 @@ export const register: Register = on => {
       const f: Flow = isActive(prev)
         ? (prev as Flow)
         : { title: 'Subagents', total: 0, done: 0, tasks: [], startedAt: at, isFinished: false, isAuto: true }
-      const idx = f.tasks.findIndex(t => t.status === 'planned' && norm(t.title) === norm(e.description))
+      const idx = f.tasks.findIndex(t => isOpen(t) && norm(t.title) === norm(e.description))
       const tasks =
         idx >= 0
           ? f.tasks.map((t, i) => (i === idx ? { ...t, ...run } : t))
